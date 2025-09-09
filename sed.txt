@@ -1,0 +1,1435 @@
+مرحبا بك كيف لقد اضف بعض التعديلات علة المشروع
+
+حيث قمت باضافة 
+utlis/customResponce.js
+// response.js
+export class ResponseStatus {
+  static OK = { code: 200, status: "OK", success: true };
+  static RESOURCE_CREATED = {
+    code: 201,
+    status: "RESOURCE_CREATED",
+    success: true,
+  };
+  static BAD_REQUEST = { code: 400, status: "BAD_REQUEST", success: false };
+  static UNAUTHORIZED = { code: 401, status: "UNAUTHORIZED", success: false };
+  static FORBIDDEN = { code: 403, status: "FORBIDDEN", success: false };
+  static NOT_FOUND = { code: 404, status: "NOT_FOUND", success: false };
+  static INTERNAL_SERVER_ERROR = {
+    code: 500,
+    status: "INTERNAL_SERVER_ERROR",
+    success: false,
+  };
+}
+
+export class CustomResponse {
+  constructor(status, message, data, error) {
+    this.status = status;
+    this.message = message;
+    this.data = data;
+    this.error = error;
+  }
+}
+
+و prisma.schema التي لدي اصبحت
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== ENUMS =====
+enum Role {
+  CUSTOMER
+  ADMIN
+  SELLER // 👈 خيار إضافي لو توسعت لماركت بليس
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED // 👈 الطلب وصل للمستخدم
+  COMPLETED // 👈 بعد انتهاء فترة الإرجاع/إغلاق الطلب
+  CANCELED
+  RETURNED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+  DISPUTED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  PAYPAL
+  BANK_TRANSFER
+  COD // 👈 الدفع عند الاستلام
+}
+
+enum PaymentProvider {
+  STRIPE
+  PAYPAL
+  BANK
+  COD
+}
+
+// ===== MODELS =====
+// model User {
+//   id        Int       @id @default(autoincrement())
+//   name      String
+//   email     String    @unique
+//   password  String
+//   role      Role      @default(CUSTOMER)
+//   createdAt DateTime  @default(now())
+//   addresses Address[]
+//   orders    Order[]
+//   cart      Cart?
+// }
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  isVerified       Boolean   @default(false)
+  verificationToken String? 
+  verificationTokenExpires DateTime? 
+  resetPasswordToken String?
+  resetPasswordExpires DateTime?
+
+  addresses Address[]
+  orders    Order[]
+  cart      Cart?
+  wishlist  Wishlist[] // 👈 back relation
+  reviews   Review[]   // 👈 العلاقة العكسية مع Review
+}
+
+model Address {
+  id         Int    @id @default(autoincrement())
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int
+  street     String
+  city       String
+  country    String
+  postalCode String
+}
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  products    Product[]
+}
+
+// model Product {
+//   id          Int       @id @default(autoincrement())
+//   title       String
+//   slug        String    @unique
+//   description String?
+//   price       Decimal   @db.Decimal(10,2)
+//   stock       Int       @default(0)
+//   createdAt   DateTime  @default(now())
+//   category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+//   categoryId  Int?
+//   orderItems  OrderItem[]
+//   cartItems   CartItem[]
+
+//   @@index([categoryId])
+//   @@index([slug])
+// }
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int      // من 1 إلى 5
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // العلاقات
+  product   Product  @relation(fields: [productId], references: [id])
+  productId Int
+
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  // يمنع المستخدم من كتابة أكثر من مراجعة لنفس المنتج
+  @@unique([productId, userId])
+} 
+
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  title       String
+  slug        String   @unique
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  images      ProductImage[]  // علاقة مع الصور
+  createdAt   DateTime @default(now())
+
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId Int?
+
+  reviews     Review[]  // 👈 ربط مع المراجعات
+  avgRating   Float     @default(0) // متوسط التقييم
+
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+  wishlist   Wishlist[] // 👈 back relation
+
+  @@index([categoryId])
+  @@index([slug])
+}
+
+model ProductImage {
+  id        Int     @id @default(autoincrement())
+  url       String  // رابط الصورة من Cloudinary
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Cart {
+  id        Int        @id @default(autoincrement())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int        @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  items     CartItem[]
+}
+
+model CartItem {
+  id        Int     @id @default(autoincrement())
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId    Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+  quantity  Int     @default(1)
+
+  @@unique([cartId, productId])
+}
+
+model Order {
+  id            Int            @id @default(autoincrement())
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        Int
+  totalAmount   Decimal        @db.Decimal(10, 2)
+  status        OrderStatus    @default(PENDING)
+  paymentMethod PaymentMethod?
+  createdAt     DateTime       @default(now())
+  items         OrderItem[]
+  payment       Payment?
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId Int
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+}
+
+model Payment {
+  id            Int             @id @default(autoincrement())
+  order         Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId       Int             @unique
+  provider      PaymentProvider
+  transactionId String?         @unique
+  status        PaymentStatus   @default(PENDING)
+  createdAt     DateTime        @default(now())
+
+  @@index([status])
+}
+
+// model Wishlist {
+//   id        Int      @id @default(autoincrement())
+//   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+//   userId    Int
+//   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+//   productId Int
+
+//   createdAt DateTime @default(now())
+
+//   @@unique([userId, productId]) // مستخدم ما يضيف نفس المنتج مرتين
+// }
+model Wishlist {
+  id        Int     @id @default(autoincrement())
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+1- قمت باضافة ميزة تفعيل الحساب باستخدام email بالاضافة الى امكانية تغير كلمة المرور
+هذه هي الملفات المسؤولة عن هذه التعديلات
+utils/sendEmail.js
+import nodemailer from "nodemailer";
+
+const transporter = nodemailer.createTransport({
+  service: "gmail", // أو smtp provider
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+export default async function sendEmail(to, subject, text) {
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to,
+    subject,
+    text,
+  });
+}
+
+service/userService.js
+import prisma from "../config/db.js";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
+import crypto from "crypto";
+import sendEmail from "../utils/sendEmail.js"; // تحتاج تعمل util لإرسال البريد
+
+export const register = async ({
+  name,
+  email,
+  password,
+  role = "CUSTOMER",
+}) => {
+  if (await prisma.user.findUnique({ where: { email } }))
+    throw new CustomResponse(ResponseStatus.FORBIDDEN, "Email already in use");
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const verificationToken = crypto.randomBytes(32).toString("hex");
+  const verificationTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // ساعة واحدة
+
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      password: hashedPassword,
+      role,
+      verificationToken,
+      verificationTokenExpires,
+    },
+  });
+
+  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+
+  await sendEmail(
+    email,
+    "Verify Your Account",
+    `Click here to verify your account: ${verificationUrl}`
+  );
+
+  return user;
+};
+
+export const verifyEmail = async (token) => {
+  const user = await prisma.user.findFirst({
+    where: { verificationToken: token },
+  });
+
+  if (!user) {
+    // check لو الحساب متفعل مسبقًا لكن التوكن null
+    const alreadyUser = await prisma.user.findFirst({
+      where: { isVerified: true },
+    });
+
+    if (alreadyUser) {
+      return { alreadyVerified: true, message: "Account already verified" };
+    }
+
+    throw new CustomResponse(
+      ResponseStatus.NOT_FOUND,
+      "Invalid or expired token"
+    );
+  }
+
+  if (user.isVerified) {
+    return { alreadyVerified: true, message: "Account already verified" };
+  }
+
+  if (user.verificationTokenExpires < new Date()) {
+    throw new CustomResponse(ResponseStatus.FORBIDDEN, "Token expired");
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      isVerified: true,
+      verificationToken: null,
+      verificationTokenExpires: null,
+    },
+  });
+
+  return updatedUser;
+};
+
+// export const verifyEmail = async (token) => {
+//   const user = await prisma.user.findFirst({
+//     where: { verificationToken: token },
+//   });
+
+//   if (!user) throw new Error("Invalid or expired token");
+
+//   const updatedUser = await prisma.user.update({
+//     where: { id: Number(user.id) },
+//     data: {
+//       isVerified: true,
+//       verificationToken: null,
+//     },
+//   });
+
+//   console.log("✅ Updated User:", updatedUser);
+//   return updatedUser;
+// };
+
+export const resendVerificationEmail = async (email) => {
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  if (user.isVerified) {
+    throw new Error("Account already verified");
+  }
+
+  // 🔑 إنشاء توكن جديد
+  const verificationToken = crypto.randomBytes(32).toString("hex");
+
+  // تحديث المستخدم بالتوكن الجديد وصلاحيته
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      verificationToken,
+      verificationTokenExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
+    },
+  });
+
+  // 🔗 رابط التفعيل
+  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+
+  // ✉️ إرسال الإيميل
+  await sendEmail({
+    to: user.email,
+    subject: "Verify Your Email (Resent Link)",
+    html: `<p>Please verify your email by clicking the link below:</p>
+           <a href="${verificationUrl}">${verificationUrl}</a>`,
+  });
+
+  return { message: "Verification email resent successfully" };
+};
+
+export const requestPasswordReset = async (email) => {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) throw new Error("User not found");
+
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  const expires = new Date(Date.now() + 3600000); // ساعة صلاحية
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      resetPasswordToken: resetToken,
+      resetPasswordExpires: expires,
+    },
+  });
+
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+  await sendEmail(
+    email,
+    "Reset Password",
+    `Reset your password here: ${resetUrl}`
+  );
+
+  return true;
+};
+
+export const resetPassword = async (token, newPassword) => {
+  const user = await prisma.user.findFirst({
+    where: {
+      resetPasswordToken: token,
+      resetPasswordExpires: { gt: new Date() },
+    },
+  });
+
+  if (!user) throw new Error("Invalid or expired token");
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password: hashedPassword,
+      resetPasswordToken: null,
+      resetPasswordExpires: null,
+    },
+  });
+
+  return true;
+};
+
+// old register
+export const register1 = async ({
+  name,
+  email,
+  password,
+  role = "CUSTOMER",
+}) => {
+  if (email === (await prisma.user.findUnique({ where: { email } }))?.email)
+    throw new CustomResponse(
+      ResponseStatus.FORBIDDEN,
+      "This email is Already used"
+    );
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const user = await prisma.user.create({
+    data: { name, email, password: hashedPassword, role },
+  });
+  return user;
+};
+
+export const login = async ({ email, password }) => {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) throw new Error("User not found");
+  //CustomResponse(ResponseStatus.NOT_FOUND, "User not found");
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) throw new Error("Invalid credentials");
+
+  const token = jwt.sign(
+    { userId: user.id, role: user.role },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "7d",
+    }
+  );
+
+  return { user, token };
+};
+
+export const getProfile = async (userId) => {
+  return await prisma.user.findUnique({
+    where: { id: userId },
+    include: { addresses: true },
+  });
+};
+
+ccontrollers/userContoller.js
+import * as userService from "../services/userService.js";
+import { ResponseStatus, CustomResponse } from "../utils/customResponse.js";
+
+export const register = async (req, res, next) => {
+  try {
+    const user = await userService.register(req.body);
+    res
+      .status(ResponseStatus.RESOURCE_CREATED.code)
+      .json(
+        new CustomResponse(
+          ResponseStatus.RESOURCE_CREATED,
+          "User Registered, please verify your email!",
+          user
+        )
+      );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const login = async (req, res, next) => {
+  try {
+    const { user, token } = await userService.login(req.body);
+
+    if (!user.isVerified) {
+      return res
+        .status(ResponseStatus.FORBIDDEN.code)
+        .json(
+          new CustomResponse(
+            ResponseStatus.FORBIDDEN,
+            "Please verify your email before login"
+          )
+        );
+    }
+
+    res.status(ResponseStatus.OK.code).json(
+      new CustomResponse(ResponseStatus.OK, "Login Successfully", {
+        user,
+        token,
+      })
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyEmail = async (req, res, next) => {
+  try {
+    const token = req.params.token;
+    const result = await userService.verifyEmail(token);
+
+    if (result.alreadyVerified) {
+      return res
+        .status(ResponseStatus.OK.code)
+        .json(new CustomResponse(ResponseStatus.OK, result.message, null));
+    }
+
+    res
+      .status(ResponseStatus.OK.code)
+      .json(
+        new CustomResponse(
+          ResponseStatus.OK,
+          "Email verified successfully!",
+          result
+        )
+      );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resendVerificationEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const result = await userService.resendVerificationEmail(email);
+
+    return res
+      .status(ResponseStatus.OK.code)
+      .json(new CustomResponse(ResponseStatus.OK, result.message));
+  } catch (error) {
+    return res
+      .status(ResponseStatus.BAD_REQUEST.code)
+      .json(
+        new CustomResponse(
+          ResponseStatus.BAD_REQUEST,
+          error.message || "Unable to resend verification email"
+        )
+      );
+  }
+};
+
+export const requestPasswordReset = async (req, res, next) => {
+  try {
+    await userService.requestPasswordReset(req.body.email);
+    res
+      .status(ResponseStatus.OK.code)
+      .json(
+        new CustomResponse(ResponseStatus.OK, "Password reset email sent!")
+      );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resetPassword = async (req, res, next) => {
+  try {
+    await userService.resetPassword(req.params.token, req.body.password);
+    res
+      .status(ResponseStatus.OK.code)
+      .json(
+        new CustomResponse(ResponseStatus.OK, "Password reset successful!")
+      );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getProfile = async (req, res, next) => {
+  try {
+    const user = await userService.getProfile(req.user.userId);
+    res.status(ResponseStatus.OK.code).json(user);
+  } catch (error) {
+    next(error);
+  }
+};
+
+routes/userRoutes.js
+import { Router } from "express";
+import * as userController from "../controllers/userController.js";
+import { auth, isAdmin } from "../middlewares/authMiddleware.js";
+
+const router = Router();
+
+// Register + Login
+router.post("/register", userController.register);
+router.post("/login", userController.login);
+
+// Email Verification
+router.get("/verify-email/:token", userController.verifyEmail);
+
+// Password Reset
+router.post("/request-password-reset", userController.requestPasswordReset);
+router.post("/request-password-reset", userController.requestPasswordReset);
+router.post("/reset-password/:token", userController.resetPassword);
+
+// 🔄 إعادة إرسال رابط التفعيل
+router.post("/resend-verification", userController.resendVerificationEmail);
+
+// Profile
+router.get("/profile", auth, userController.getProfile);
+
+export default router;
+
+2- امكانية اضافة عدة صور لكل منتج باستخدام Cloudinary and multer
+config/Cloudinary.js
+import { v2 as cloudinary } from "cloudinary";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET, // لازم يكون موجود للسيرفر
+});
+
+export default cloudinary;
+
+productsService.js
+
+import prisma from "../config/db.js";
+import slugify from "slugify";
+import cloudinary from "../config/cloudinary.js";
+
+export const getProducts = async (query) => {
+  const {
+    page = 1,
+    limit = 10,
+    search,
+    categoryId,
+    minPrice,
+    maxPrice,
+    sortBy = "createdAt",
+    order = "desc",
+    inStock,
+  } = query;
+
+  const skip = (page - 1) * limit;
+  const take = parseInt(limit);
+
+  // ✅ بناء شروط البحث
+  const where = {
+    AND: [
+      search
+        ? {
+            OR: [
+              { title: { contains: search } },
+              { description: { contains: search } },
+            ],
+          }
+        : {},
+      categoryId ? { categoryId: Number(categoryId) } : {},
+      minPrice ? { price: { gte: parseFloat(minPrice) } } : {},
+      maxPrice ? { price: { lte: parseFloat(maxPrice) } } : {},
+      inStock === "true" ? { stock: { gt: 0 } } : {},
+    ],
+  };
+
+  // ✅ عدد المنتجات
+  const total = await prisma.product.count({ where });
+
+  // ✅ المنتجات
+  const products = await prisma.product.findMany({
+    where,
+    skip,
+    take,
+    orderBy: { [sortBy]: order },
+    include: {
+      category: true,
+      images: true,
+    },
+  });
+
+  return {
+    page: Number(page),
+    limit: take,
+    total,
+    totalPages: Math.ceil(total / take),
+    products,
+  };
+};
+
+export const getAllProducts = async (filters = {}) => {
+  return await prisma.product.findMany({
+    where: filters,
+    include: { category: true, images: true },
+  });
+};
+
+export const getProductById = async (id) => {
+  return await prisma.product.findUnique({
+    where: { id: Number(id) },
+    include: { category: true, images: true },
+  });
+};
+
+export const createProduct = async (data, files) => {
+  const { title, description, price, stock, categoryId } = data;
+
+  const slug = slugify(title, { lower: true, strict: true });
+
+  // ارفع الصور على Cloudinary
+  const uploadPromises = files.map((file) =>
+    cloudinary.uploader
+      .upload_stream({ folder: "products" }, (error, result) => {
+        if (error) throw error;
+        return result.secure_url;
+      })
+      .end(file.buffer)
+  );
+
+  // ⚡️ لازم نحول الـ stream لوعود (Promises)
+  const urls = await Promise.all(
+    files.map(
+      (file) =>
+        new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: "products" },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result.secure_url);
+            }
+          );
+          stream.end(file.buffer);
+        })
+    )
+  );
+
+  // أنشئ المنتج
+  const product = await prisma.product.create({
+    data: {
+      title,
+      slug,
+      description,
+      price: parseFloat(price),
+      stock: parseInt(stock),
+      categoryId: categoryId ? parseInt(categoryId) : null,
+      // خزن الصور في جدول منفصل لو عندك ProductImage
+      images: {
+        create: urls.map((url) => ({ url })),
+      },
+    },
+    include: { images: true },
+  });
+
+  return product;
+};
+
+export const updateProduct = async (id, data, files) => {
+  const { title, description, price, stock, categoryId } = data;
+
+  // لو فيه title جديد، اعمل slug
+  const slug = title
+    ? slugify(title, { lower: true, strict: true })
+    : undefined;
+
+  // 1️⃣ ارفع الصور الجديدة لو موجودة
+  let newImages = [];
+  if (files && files.length > 0) {
+    newImages = await Promise.all(
+      files.map(
+        (file) =>
+          new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              { folder: "products" },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve({ url: result.secure_url });
+              }
+            );
+            stream.end(file.buffer);
+          })
+      )
+    );
+  }
+
+  // 2️⃣ احذف الصور القديمة (لو عايز تحذفها فعليًا من Cloudinary كمان)
+  if (newImages.length > 0) {
+    const oldImages = await prisma.productImage.findMany({
+      where: { productId: Number(id) },
+    });
+
+    // احذف من Cloudinary (اختياري)
+    for (const img of oldImages) {
+      const publicId = img.url.split("/").pop().split(".")[0]; // استخرج public_id من الرابط
+      try {
+        await cloudinary.uploader.destroy(`products/${publicId}`);
+      } catch (err) {
+        console.error("❌ Failed to delete from Cloudinary:", err.message);
+      }
+    }
+
+    // امسح من DB
+    await prisma.productImage.deleteMany({
+      where: { productId: Number(id) },
+    });
+  }
+
+  // 3️⃣ حدث بيانات المنتج
+  const updatedProduct = await prisma.product.update({
+    where: { id: Number(id) },
+    data: {
+      title,
+      slug,
+      description,
+      price: price ? parseFloat(price) : undefined,
+      stock: stock ? parseInt(stock) : undefined,
+      categoryId: categoryId ? Number(categoryId) : undefined,
+      ...(newImages.length > 0 && {
+        images: {
+          create: newImages, // الصور الجديدة
+        },
+      }),
+    },
+    include: { images: true },
+  });
+
+  return updatedProduct;
+};
+
+export const updateProductWithoutDeleteOldImage = async (id, data, files) => {
+  const { title, description, price, stock, categoryId } = data;
+
+  // slug جديد لو العنوان اتغير
+  const slug = title
+    ? slugify(title, { lower: true, strict: true })
+    : undefined;
+
+  // 1️⃣ ارفع الصور الجديدة لو موجودة
+  let newImages = [];
+  if (files && files.length > 0) {
+    newImages = await Promise.all(
+      files.map(
+        (file) =>
+          new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              { folder: "products" },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve({ url: result.secure_url });
+              }
+            );
+            stream.end(file.buffer);
+          })
+      )
+    );
+  }
+
+  // 2️⃣ حدث بيانات المنتج + أضف الصور الجديدة (لو فيه)
+  const updatedProduct = await prisma.product.update({
+    where: { id: Number(id) },
+    data: {
+      title,
+      slug,
+      description,
+      price: price ? parseFloat(price) : undefined,
+      stock: stock ? parseInt(stock) : undefined,
+      categoryId: categoryId ? Number(categoryId) : undefined,
+      ...(newImages.length > 0 && {
+        images: {
+          create: newImages, // يضيف الصور الجديدة جنب القديمة
+        },
+      }),
+    },
+    include: { images: true },
+  });
+
+  return updatedProduct;
+};
+
+export const deleteProduct = async (id) => {
+  // 1️⃣ هات الصور المرتبطة بالمنتج
+  const product = await prisma.product.findUnique({
+    where: { id: Number(id) },
+    include: { images: true },
+  });
+
+  if (!product) {
+    throw new Error("❌ Product not found");
+  }
+
+  // 2️⃣ امسح الصور من Cloudinary
+  for (const img of product.images) {
+    try {
+      // استخرج public_id من رابط الصورة
+      const publicId = img.url.split("/").pop().split(".")[0];
+      await cloudinary.uploader.destroy(`products/${publicId}`);
+    } catch (err) {
+      console.error("⚠️ Failed to delete image from Cloudinary:", err.message);
+    }
+  }
+
+  // 3️⃣ امسح المنتج (مع الصور من DB)
+  const deletedProduct = await prisma.product.delete({
+    where: { id: Number(id) },
+  });
+
+  return deletedProduct;
+};
+
+controllers/productContoller.js
+import * as productService from "../services/productService.js";
+import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
+
+export const getProducts = async (req, res, next) => {
+  try {
+    const products = await productService.getProducts(req.query);
+    res
+      .status(ResponseStatus.OK.code)
+      .json(new CustomResponse(ResponseStatus.OK, "Products", { ...products }));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getProduct = async (req, res, next) => {
+  try {
+    const product = await productService.getProductById(req.params.id);
+    if (!product)
+      return res
+        .status(ResponseStatus.NOT_FOUND.code)
+        .json(new CustomResponse(ResponseStatus.NOT_FOUND, "Not Found!"));
+    res
+      .status(ResponseStatus.OK.code)
+      .json(new CustomResponse(ResponseStatus.OK, "Product", product));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createProduct = async (req, res, next) => {
+  try {
+    const product = await productService.createProduct(req.body, req.files);
+
+    res
+      .status(ResponseStatus.RESOURCE_CREATED.code)
+      .json(
+        new CustomResponse(
+          ResponseStatus.RESOURCE_CREATED,
+          "Product Created Successfully!",
+          product
+        )
+      );
+  } catch (error) {
+    next(error);
+  }
+};
+export const updateProduct = async (req, res, next) => {
+  try {
+    const product = await productService.updateProduct(
+      req.params.id,
+      req.body,
+      req.files
+    );
+    res
+      .status(ResponseStatus.OK.code)
+      .json(
+        new CustomResponse(
+          ResponseStatus.OK,
+          "Success Update a Producct",
+          product
+        )
+      );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteProduct = async (req, res, next) => {
+  try {
+    await productService.deleteProduct(req.params.id);
+    res.json(new CustomResponse(ResponseStatus.OK, "Deleted"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+middlewares/upload.js
+// import multer from "multer";
+// import { CloudinaryStorage } from "multer-storage-cloudinary";
+// import cloudinary from "../config/cloudinary.js";
+
+// const storage = new CloudinaryStorage({
+//   cloudinary,
+//   params: {
+//     folder: "ecommerce_products", // مجلد على Cloudinary
+//     allowed_formats: ["jpg", "png", "jpeg", "webp"],
+//   },
+// });
+
+import multer from "multer";
+
+// نخزن في الذاكرة (buffer) عشان نرفعها مباشرة لـ Cloudinary
+const storage = multer.memoryStorage();
+
+export const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB لكل صورة
+});
+
+
+routes/productRoutes.js
+import { Router } from "express";
+import { auth, isAdmin } from "../middlewares/authMiddleware.js";
+import * as productController from "../controllers/productController.js";
+import { productValidator } from "../validators/index.js";
+import { validate } from "../middlewares/validationRequest.js";
+import { upload } from "../middlewares/upload.js";
+
+// إضافة منتج مع صورة
+
+const router = Router();
+
+router.get("/", productController.getProducts);
+router.get("/:id", productController.getProduct);
+router.post(
+  "/add",
+  auth,
+  isAdmin,
+  upload.array("images", 5), // رفع حتى 5 صور
+  productValidator,
+  validate,
+  productController.createProduct
+);
+router.put(
+  "/update/:id",
+  auth,
+  isAdmin,
+  upload.array("images", 5), // رفع حتى 5 صور
+  productValidator,
+  validate,
+  productController.updateProduct
+);
+router.delete("/delete/:id", auth, isAdmin, productController.deleteProduct);
+
+export default router;
+
+3- اضفت ميزة reviews and rating للمنتجات
+service/reviewService.js
+import prisma from "../config/db.js";
+
+export const addReview = async (userId, productId, { rating, comment }) => {
+  // تحقق إذا كان المستخدم قيّم المنتج من قبل
+  const existingReview = await prisma.review.findUnique({
+    where: { productId_userId: { productId, userId } },
+  });
+
+  if (existingReview) {
+    throw new Error("You already reviewed this product");
+  }
+
+  // إضافة مراجعة جديدة
+  const review = await prisma.review.create({
+    data: {
+      rating,
+      comment,
+      productId,
+      userId,
+    },
+  });
+
+  // تحديث متوسط التقييم
+  await updateProductAvgRating(productId);
+
+  return review;
+};
+
+export const updateReview = async (userId, productId, { rating, comment }) => {
+  const review = await prisma.review.update({
+    where: { productId_userId: { productId, userId } },
+    data: { rating, comment },
+  });
+
+  await updateProductAvgRating(productId);
+  return review;
+};
+
+export const deleteReview = async (userId, productId) => {
+  await prisma.review.delete({
+    where: { productId_userId: { productId, userId } },
+  });
+
+  await updateProductAvgRating(productId);
+  return true;
+};
+
+export const getProductReviews = async (productId) => {
+  return await prisma.review.findMany({
+    where: { productId },
+    include: {
+      user: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+};
+
+const updateProductAvgRating = async (productId) => {
+  const result = await prisma.review.aggregate({
+    where: { productId },
+    _avg: { rating: true },
+  });
+
+  await prisma.product.update({
+    where: { id: productId },
+    data: { avgRating: result._avg.rating || 0 },
+  });
+};
+
+controllers/reviewController.js
+import * as reviewService from "../services/reviewService.js";
+import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
+
+export const addReview = async (req, res, next) => {
+  try {
+    const { productId, rating, comment } = req.body;
+    const review = await reviewService.addReview(req.user.userId, productId, {
+      rating,
+      comment,
+    });
+
+    res
+      .status(ResponseStatus.RESOURCE_CREATED.code)
+      .json(
+        new CustomResponse(
+          ResponseStatus.RESOURCE_CREATED,
+          "Review added successfully",
+          review
+        )
+      );
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateReview = async (req, res, next) => {
+  try {
+    const { productId, rating, comment } = req.body;
+    const review = await reviewService.updateReview(
+      req.user.userId,
+      productId,
+      {
+        rating,
+        comment,
+      }
+    );
+
+    res.json(
+      new CustomResponse(
+        ResponseStatus.OK,
+        "Review updated successfully",
+        review
+      )
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteReview = async (req, res, next) => {
+  try {
+    const { productId } = req.body;
+    await reviewService.deleteReview(req.user.userId, productId);
+
+    res.json(
+      new CustomResponse(ResponseStatus.OK, "Review deleted successfully")
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getProductReviews = async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+    const reviews = await reviewService.getProductReviews(Number(productId));
+
+    res.json(
+      new CustomResponse(
+        ResponseStatus.OK,
+        "Reviews fetched successfully",
+        reviews
+      )
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+routes/reviewRoutes.js
+import { Router } from "express";
+import * as reviewController from "../controllers/reviewController.js";
+import { auth } from "../middlewares/authMiddleware.js";
+
+const router = Router();
+
+// إضافة مراجعة
+router.post("/add", auth, reviewController.addReview);
+
+// تعديل مراجعة
+router.put("/update", auth, reviewController.updateReview);
+
+// حذف مراجعة
+router.delete("/delete", auth, reviewController.deleteReview);
+
+// جلب مراجعات المنتج
+router.get("/product/:productId", reviewController.getProductReviews);
+
+export default router;
+
+4- wishlist للمستخدم
+
+services/wishlistService.js
+import prisma from "../config/db.js";
+
+export async function addToWishlist(userId, productId) {
+  return prisma.wishlist.create({
+    data: { userId, productId },
+  });
+}
+
+export async function removeFromWishlist(userId, productId) {
+  return prisma.wishlist.deleteMany({
+    where: { userId, productId },
+  });
+}
+
+export async function getWishlist(userId) {
+  return prisma.wishlist.findMany({
+    where: { userId },
+    include: { product: true },
+  });
+}
+
+controllers/wishlistController.js
+import * as wishlistService from "../services/wishlistService.js";
+import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
+
+export const addWishlist = async (req, res, next) => {
+  try {
+  
+    const result = await wishlistService.addToWishlist(
+      req.user.userId, // 👈 من JWT أو session
+      req.body.productId
+    );
+    res
+      .status(ResponseStatus.RESOURCE_CREATED.code)
+      .json(
+        new CustomResponse(
+          ResponseStatus.RESOURCE_CREATED,
+          "item added to wishlist",
+          result
+        )
+      );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const removeWishlist = async (req, res, next) => {
+  try {
+    await wishlistService.removeFromWishlist(
+      req.user.id,
+      parseInt(req.params.productId)
+    );
+    res.json(new CustomResponse(ResponseStatus.OK, "Removed from wishlist"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getWishlist = async (req, res, next) => {
+  try {
+    const wishlist = await wishlistService.getWishlist(req.user.id);
+    res.json(new CustomResponse(ResponseStatus.OK, "wishlist", wishlist));
+  } catch (error) {
+    next(error);
+  }
+};
+
+routes/wishlistRoutes.js
+import express from "express";
+import {
+  addWishlist,
+  removeWishlist,
+  getWishlist,
+} from "../controllers/wishlistController.js";
+import { isCustomer, auth } from "../middlewares/authMiddleware.js";
+
+const router = express.Router();
+
+router.post("/", auth, isCustomer, addWishlist);
+router.delete("/:productId", auth, isCustomer, removeWishlist);
+router.get("/", auth, isCustomer, getWishlist);
+
+export default router;
+
+4- عدلت middlewares/authMiddleware.js
+import jwt from "jsonwebtoken";
+import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
+
+export const auth = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader)
+    return res
+      .status(ResponseStatus.UNAUTHORIZED.code)
+      .json(
+        new CustomResponse(ResponseStatus.UNAUTHORIZED, "No token provided")
+      );
+
+  const token = authHeader.split(" ")[1]; // Bearer <token>
+  //{ error: "Invalid token format" }
+  if (!token)
+    return res
+      .status(ResponseStatus.UNAUTHORIZED.code)
+      .json(
+        new CustomResponse(ResponseStatus.UNAUTHORIZED, "Invalid token format")
+      );
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded; // { userId, role }
+    //console.log(decoded);
+    next();
+  } catch (error) {
+    return res
+      .status(ResponseStatus.FORBIDDEN.code)
+      .json(
+        new CustomResponse(ResponseStatus.FORBIDDEN, "Invalid or expired token")
+      );
+
+    //{ error: "Invalid or expired token" }
+  }
+};
+
+export const isAdmin = (req, _res, next) => {
+  if (req.user.role !== "ADMIN") {
+    return _res
+      .status(ResponseStatus.FORBIDDEN.code)
+      .json(
+        new CustomResponse(ResponseStatus.FORBIDDEN, "Admin access required")
+      );
+  }
+  next();
+};
+
+export const isCustomer = (req, res, next) => {
+  if (req.user.role !== "CUSTOMER") {
+    new CustomResponse(ResponseStatus.FORBIDDEN, "Customer access required");
+  }
+  next();
+};
+

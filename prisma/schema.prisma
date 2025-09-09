@@ -1,0 +1,243 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== ENUMS =====
+enum Role {
+  CUSTOMER
+  ADMIN
+  SELLER // 👈 خيار إضافي لو توسعت لماركت بليس
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED // 👈 الطلب وصل للمستخدم
+  COMPLETED // 👈 بعد انتهاء فترة الإرجاع/إغلاق الطلب
+  CANCELED
+  RETURNED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+  DISPUTED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  PAYPAL
+  BANK_TRANSFER
+  COD // 👈 الدفع عند الاستلام
+}
+
+enum PaymentProvider {
+  STRIPE
+  PAYPAL
+  BANK
+  COD
+}
+
+// ===== MODELS =====
+// model User {
+//   id        Int       @id @default(autoincrement())
+//   name      String
+//   email     String    @unique
+//   password  String
+//   role      Role      @default(CUSTOMER)
+//   createdAt DateTime  @default(now())
+//   addresses Address[]
+//   orders    Order[]
+//   cart      Cart?
+// }
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  isVerified       Boolean   @default(false)
+  verificationToken String? 
+  verificationTokenExpires DateTime? 
+  resetPasswordToken String?
+  resetPasswordExpires DateTime?
+
+  addresses Address[]
+  orders    Order[]
+  cart      Cart?
+  wishlist  Wishlist[] // 👈 back relation
+  reviews   Review[]   // 👈 العلاقة العكسية مع Review
+}
+
+model Address {
+  id         Int    @id @default(autoincrement())
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int
+  street     String
+  city       String
+  country    String
+  postalCode String
+}
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  products    Product[]
+}
+
+// model Product {
+//   id          Int       @id @default(autoincrement())
+//   title       String
+//   slug        String    @unique
+//   description String?
+//   price       Decimal   @db.Decimal(10,2)
+//   stock       Int       @default(0)
+//   createdAt   DateTime  @default(now())
+//   category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+//   categoryId  Int?
+//   orderItems  OrderItem[]
+//   cartItems   CartItem[]
+
+//   @@index([categoryId])
+//   @@index([slug])
+// }
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int      // من 1 إلى 5
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // العلاقات
+  product   Product  @relation(fields: [productId], references: [id])
+  productId Int
+
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  // يمنع المستخدم من كتابة أكثر من مراجعة لنفس المنتج
+  @@unique([productId, userId])
+} 
+
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  title       String
+  slug        String   @unique
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  images      ProductImage[]  // علاقة مع الصور
+  createdAt   DateTime @default(now())
+
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId Int?
+
+  reviews     Review[]  // 👈 ربط مع المراجعات
+  avgRating   Float     @default(0) // متوسط التقييم
+
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+  wishlist   Wishlist[] // 👈 back relation
+
+  @@index([categoryId])
+  @@index([slug])
+}
+
+model ProductImage {
+  id        Int     @id @default(autoincrement())
+  url       String  // رابط الصورة من Cloudinary
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Cart {
+  id        Int        @id @default(autoincrement())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int        @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  items     CartItem[]
+}
+
+model CartItem {
+  id        Int     @id @default(autoincrement())
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId    Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+  quantity  Int     @default(1)
+
+  @@unique([cartId, productId])
+}
+
+model Order {
+  id            Int            @id @default(autoincrement())
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        Int
+  totalAmount   Decimal        @db.Decimal(10, 2)
+  status        OrderStatus    @default(PENDING)
+  paymentMethod PaymentMethod?
+  createdAt     DateTime       @default(now())
+  items         OrderItem[]
+  payment       Payment?
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId Int
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+}
+
+model Payment {
+  id            Int             @id @default(autoincrement())
+  order         Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId       Int             @unique
+  provider      PaymentProvider
+  transactionId String?         @unique
+  status        PaymentStatus   @default(PENDING)
+  createdAt     DateTime        @default(now())
+
+  @@index([status])
+}
+
+// model Wishlist {
+//   id        Int      @id @default(autoincrement())
+//   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+//   userId    Int
+//   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+//   productId Int
+
+//   createdAt DateTime @default(now())
+
+//   @@unique([userId, productId]) // مستخدم ما يضيف نفس المنتج مرتين
+// }
+model Wishlist {
+  id        Int     @id @default(autoincrement())
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
