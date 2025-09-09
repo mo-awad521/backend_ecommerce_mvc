@@ -3,15 +3,15 @@ import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
 
-import userRoutes from "./routes/userRoutes.js";
-import categoryRoutes from "./routes/categoryRoutes.js";
-import productRoutes from "./routes/productRoutes.js";
-import cartRoutes from "./routes/cartRoutes.js";
-import orderRoutes from "./routes/orderRoutes.js";
-import paymentRoutes from "./routes/paymentRoutes.js";
-import addressRoutes from "./routes/addressRoutes.js";
-import wishlistRoutes from "./routes/wishlistRoutes.js";
-import reviewRoutes from "./routes/reviewRoutes.js";
+import userRoutes from "./routes/users.routes.js";
+import categoryRoutes from "./routes/categories.routes.js";
+import productRoutes from "./routes/products.routes.js";
+import cartRoutes from "./routes/cart.routes.js";
+import orderRoutes from "./routes/orders.routes.js";
+import paymentRoutes from "./routes/payments.routes.js";
+import addressRoutes from "./routes/addresses.routes.js";
+import wishlistRoutes from "./routes/wishlists.routes.js";
+import reviewRoutes from "./routes/reviews.routes.js";
 
 import errorHandler from "./middlewares/errorHandler.js";
 

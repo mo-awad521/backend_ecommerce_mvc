@@ -1,4 +1,4 @@
-import * as addressService from "../services/addressService.js";
+import { addressService } from "../services";
 import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
 
 export const getAddresses = async (req, res) => {

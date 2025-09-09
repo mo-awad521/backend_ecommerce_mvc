@@ -1,4 +1,4 @@
-import * as paymentService from "../services/paymentService.js";
+import { paymentService } from "../services";
 import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
 
 export const createPayment = async (req, res, next) => {

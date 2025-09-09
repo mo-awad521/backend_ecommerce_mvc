@@ -1,9 +1,8 @@
-import * as wishlistService from "../services/wishlistService.js";
+import { wishlistService } from "../services";
 import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
 
 export const addWishlist = async (req, res, next) => {
   try {
-  
     const result = await wishlistService.addToWishlist(
       req.user.userId, // 👈 من JWT أو session
       req.body.productId

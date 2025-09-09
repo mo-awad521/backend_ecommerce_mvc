@@ -204,11 +204,11 @@ import {
   getOrderById,
   cancelOrder,
   updateOrderStatus,
-} from "../controllers/orderController.js";
+} from "./src/controllers/orderController.js";
 import {
   authMiddleware,
   adminMiddleware,
-} from "../middlewares/authMiddleware.js";
+} from "./src/middlewares/authMiddleware.js";
 
 const router = express.Router();
 

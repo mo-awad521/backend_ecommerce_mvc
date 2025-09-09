@@ -1,5 +1,5 @@
 import { Router } from "express";
-import * as userController from "../controllers/userController.js";
+import * as userController from "../controllers/users.controller.js";
 import { auth, isAdmin } from "../middlewares/authMiddleware.js";
 
 const router = Router();
@@ -12,7 +12,6 @@ router.post("/login", userController.login);
 router.get("/verify-email/:token", userController.verifyEmail);
 
 // Password Reset
-router.post("/request-password-reset", userController.requestPasswordReset);
 router.post("/request-password-reset", userController.requestPasswordReset);
 router.post("/reset-password/:token", userController.resetPassword);
 

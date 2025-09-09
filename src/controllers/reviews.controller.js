@@ -1,4 +1,4 @@
-import * as reviewService from "../services/reviewService.js";
+import { reviewService } from "../services";
 import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
 
 export const addReview = async (req, res, next) => {

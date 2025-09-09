@@ -1,0 +1,9 @@
+export * as userController from "./users.controller.js";
+export * as productController from "./products.controller.js";
+export * as addressController from "./addresses.controller.js";
+export * as categoryController from "./categories.controller.js";
+export * as orderController from "./orders.controller.js";
+export * as cartController from "./cart.controller.js";
+export * as paymentController from "./payments.controller.js";
+export * as wishlistController from "./wishlist.controller.js";
+export * as reviewController from "./reviews.controller.js";

@@ -1,4 +1,4 @@
-import * as userService from "../services/userService.js";
+import { userService } from "../services";
 import { ResponseStatus, CustomResponse } from "../utils/customResponse.js";
 
 export const register = async (req, res, next) => {
