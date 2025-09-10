@@ -1,4 +1,4 @@
-import { categoryService } from "../services";
+import { categoryService } from "../services/index.js";
 import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
 
 export const getCategories = async (req, res, next) => {

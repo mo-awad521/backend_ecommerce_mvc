@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { auth, isAdmin } from "../middlewares/authMiddleware.js";
-import * as productController from "../controllers/productController.js";
+import { productController } from "../controllers/index.js";
 import { productValidator } from "../validators/index.js";
 import { validate } from "../middlewares/validationRequest.js";
 import { upload } from "../middlewares/upload.js";

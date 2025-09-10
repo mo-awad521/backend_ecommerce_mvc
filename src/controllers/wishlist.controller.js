@@ -1,4 +1,4 @@
-import { wishlistService } from "../services";
+import { wishlistService } from "../services/index.js";
 import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
 
 export const addWishlist = async (req, res, next) => {

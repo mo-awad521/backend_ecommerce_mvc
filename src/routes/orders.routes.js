@@ -1,5 +1,5 @@
 import { Router } from "express";
-import * as orderController from "../controllers/orderController.js";
+import { orderController } from "../controllers/index.js";
 import { auth, isAdmin } from "../middlewares/authMiddleware.js";
 import { createOrderValidator } from "../validators/index.js";
 import { validate } from "../middlewares/validationRequest.js";

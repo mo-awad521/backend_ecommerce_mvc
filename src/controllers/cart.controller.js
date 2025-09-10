@@ -1,4 +1,4 @@
-import { cartService } from "../services";
+import { cartService } from "../services/index.js";
 import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
 
 export const getCart = async (req, res, next) => {

@@ -228,3 +228,5 @@ router.patch("/:id/cancel", authMiddleware, cancelOrder);
 router.patch("/:id/status", authMiddleware, adminMiddleware, updateOrderStatus);
 
 export default router;
+
+///تحبني أضيفلك كمان endpoint لحساب متوسط التقييم (avgRating) للمنتج بحيث تجيبه مع /reviews/product/:id بدل ما ترجع بس المراجعات؟

@@ -1,4 +1,4 @@
-import { productService } from "../services";
+import { productService } from "../services/index.js";
 import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
 
 export const getProducts = async (req, res, next) => {

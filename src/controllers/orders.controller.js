@@ -1,4 +1,4 @@
-import { orderService } from "../services";
+import { orderService } from "../services/index.js";
 import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
 
 export const createOrder = async (req, res, next) => {

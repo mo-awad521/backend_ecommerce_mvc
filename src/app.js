@@ -6,7 +6,7 @@ import helmet from "helmet";
 import userRoutes from "./routes/users.routes.js";
 import categoryRoutes from "./routes/categories.routes.js";
 import productRoutes from "./routes/products.routes.js";
-import cartRoutes from "./routes/cart.routes.js";
+import cartRoutes from "./routes/cart.route.js";
 import orderRoutes from "./routes/orders.routes.js";
 import paymentRoutes from "./routes/payments.routes.js";
 import addressRoutes from "./routes/addresses.routes.js";

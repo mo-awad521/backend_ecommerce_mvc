@@ -1,5 +1,5 @@
 import { Router } from "express";
-import * as categoryController from "../controllers/categoryController.js";
+import { categoryController } from "../controllers/index.js";
 import { auth, isAdmin } from "../middlewares/authMiddleware.js";
 import { createCategoryValidator } from "../validators/categoryValidator.js";
 import { validate } from "../middlewares/validationRequest.js";
