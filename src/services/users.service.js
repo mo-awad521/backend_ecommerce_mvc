@@ -1,9 +1,10 @@
+// src/services/users.service.js
 import prisma from "../config/db.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { CustomResponse, ResponseStatus } from "../utils/customResponse.js";
 import crypto from "crypto";
-import sendEmail from "../utils/sendEmail.js"; // تحتاج تعمل util لإرسال البريد
+import sendEmail from "../utils/sendEmail.js"; // utils لارسال الايميل
 
 export const register = async ({
   name,
@@ -17,7 +18,7 @@ export const register = async ({
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const verificationToken = crypto.randomBytes(32).toString("hex");
-  const verificationTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // ساعة واحدة
+  const verificationTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // ساعة
 
   const user = await prisma.user.create({
     data: {
@@ -47,7 +48,6 @@ export const verifyEmail = async (token) => {
   });
 
   if (!user) {
-    // check لو الحساب متفعل مسبقًا لكن التوكن null
     const alreadyUser = await prisma.user.findFirst({
       where: { isVerified: true },
     });
@@ -82,40 +82,22 @@ export const verifyEmail = async (token) => {
   return updatedUser;
 };
 
-// export const verifyEmail = async (token) => {
-//   const user = await prisma.user.findFirst({
-//     where: { verificationToken: token },
-//   });
-
-//   if (!user) throw new Error("Invalid or expired token");
-
-//   const updatedUser = await prisma.user.update({
-//     where: { id: Number(user.id) },
-//     data: {
-//       isVerified: true,
-//       verificationToken: null,
-//     },
-//   });
-
-//   console.log("✅ Updated User:", updatedUser);
-//   return updatedUser;
-// };
-
 export const resendVerificationEmail = async (email) => {
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user) {
-    throw new Error("User not found");
+    throw new CustomResponse(ResponseStatus.NOT_FOUND, "User not found");
   }
 
   if (user.isVerified) {
-    throw new Error("Account already verified");
+    throw new CustomResponse(
+      ResponseStatus.BAD_REQUEST,
+      "Account already verified"
+    );
   }
 
-  // 🔑 إنشاء توكن جديد
   const verificationToken = crypto.randomBytes(32).toString("hex");
 
-  // تحديث المستخدم بالتوكن الجديد وصلاحيته
   await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -124,10 +106,8 @@ export const resendVerificationEmail = async (email) => {
     },
   });
 
-  // 🔗 رابط التفعيل
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
 
-  // ✉️ إرسال الإيميل
   await sendEmail({
     to: user.email,
     subject: "Verify Your Email (Resent Link)",
@@ -140,10 +120,11 @@ export const resendVerificationEmail = async (email) => {
 
 export const requestPasswordReset = async (email) => {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new Error("User not found");
+  if (!user)
+    throw new CustomResponse(ResponseStatus.NOT_FOUND, "User not found");
 
   const resetToken = crypto.randomBytes(32).toString("hex");
-  const expires = new Date(Date.now() + 3600000); // ساعة صلاحية
+  const expires = new Date(Date.now() + 3600000);
 
   await prisma.user.update({
     where: { id: user.id },
@@ -171,7 +152,11 @@ export const resetPassword = async (token, newPassword) => {
     },
   });
 
-  if (!user) throw new Error("Invalid or expired token");
+  if (!user)
+    throw new CustomResponse(
+      ResponseStatus.NOT_FOUND,
+      "Invalid or expired token"
+    );
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
 
@@ -187,42 +172,33 @@ export const resetPassword = async (token, newPassword) => {
   return true;
 };
 
-// old register
-export const register1 = async ({
-  name,
-  email,
-  password,
-  role = "CUSTOMER",
-}) => {
-  if (email === (await prisma.user.findUnique({ where: { email } }))?.email)
-    throw new CustomResponse(
-      ResponseStatus.FORBIDDEN,
-      "This email is Already used"
-    );
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const user = await prisma.user.create({
-    data: { name, email, password: hashedPassword, role },
-  });
-  return user;
-};
-
+// ---------- المطلب المهم: login (موحّد) ----------
 export const login = async ({ email, password }) => {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new Error("User not found");
-  //CustomResponse(ResponseStatus.NOT_FOUND, "User not found");
+
+  if (!user) {
+    throw new CustomResponse(ResponseStatus.BAD_REQUEST, "Login Failed");
+  }
+
+  if (!user.isVerified) {
+    throw new CustomResponse(
+      ResponseStatus.FORBIDDEN,
+      "Please verify your email first"
+    );
+  }
 
   const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) throw new Error("Invalid credentials");
+  if (!isMatch) {
+    throw new CustomResponse(ResponseStatus.BAD_REQUEST, "Login Failed");
+  }
 
   const token = jwt.sign(
     { userId: user.id, role: user.role },
     process.env.JWT_SECRET,
-    {
-      expiresIn: "7d",
-    }
+    { expiresIn: "7d" }
   );
 
+  // هنا نرجع كائن واضح (لا نُغلفه بـ CustomResponse) — الController سيتولى بناء الـ response
   return { user, token };
 };
 
