@@ -208,3 +208,56 @@ export const getProfile = async (userId) => {
     include: { addresses: true },
   });
 };
+
+//------------ Admin Features -----------------
+
+// 🔹 جلب جميع المستخدمين
+export const getAllUsers = async () => {
+  return prisma.user.findMany({
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+    },
+  });
+};
+
+// 🔹 جلب مستخدم واحد
+export const getUserById = async (id) => {
+  return prisma.user.findUnique({
+    where: { id: parseInt(id) },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
+    },
+  });
+};
+
+// 🔹 تحديث دور المستخدم
+export const updateUserRole = async (id, role) => {
+  return prisma.user.update({
+    where: { id: parseInt(id) },
+    data: { role },
+  });
+};
+
+// 🔹  حذف المستخدم
+export const deleteUser = async (id) => {
+  const user = await prisma.user.findUnique({
+    where: { id: Number(id) },
+  });
+
+  if (!user) {
+    throw new Error("❌ User not found");
+  }
+  const deletedUser = await prisma.user.delete({
+    where: { id: Number(id) },
+  });
+
+  return deletedUser;
+};

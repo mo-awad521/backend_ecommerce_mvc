@@ -88,3 +88,23 @@ export const updateOrderStatus = async (req, res, next) => {
     next(error);
   }
 };
+
+//---------------------- Admin Features ------------------------------
+
+export const getAllOrders = async (req, res, next) => {
+  try {
+    const result = await orderService.getAllOrders(req.query);
+
+    res
+      .status(ResponseStatus.OK.code)
+      .json(
+        new CustomResponse(
+          ResponseStatus.OK,
+          "Orders fetched successfully",
+          result
+        )
+      );
+  } catch (err) {
+    next(err);
+  }
+};

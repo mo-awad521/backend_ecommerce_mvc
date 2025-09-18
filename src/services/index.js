@@ -7,3 +7,4 @@ export * as cartService from "./cart.Service.js";
 export * as paymentService from "./payments.service.js";
 export * as wishlistService from "./wishlist.service.js";
 export * as reviewService from "./reviews.service.js";
+export * as reportService from "./reports.service.js";

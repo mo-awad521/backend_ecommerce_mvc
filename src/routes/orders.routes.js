@@ -21,4 +21,7 @@ router.patch("/:id/cancel", auth, orderController.cancelOrder);
 // أدمن: تحديث حالة الطلب
 router.patch("/:id/status", auth, isAdmin, orderController.updateOrderStatus);
 
+// ✅ الأدمن يقدر يشوف جميع الطلبات
+router.get("/", auth, isAdmin, orderController.getAllOrders);
+
 export default router;

@@ -21,4 +21,10 @@ router.post("/resend-verification", userController.resendVerificationEmail);
 // Profile
 router.get("/profile", auth, userController.getProfile);
 
+// Admin Routes
+router.get("/", userController.getAllUsers);
+router.get("/:id", auth, isAdmin, userController.getUserById);
+router.put("/:id/role", auth, isAdmin, userController.updateUserRole);
+router.delete("/:id", auth, isAdmin, userController.deleteUser);
+
 export default router;

@@ -52,3 +52,23 @@ export const updatePayment = async (req, res, next) => {
     next(error);
   }
 };
+
+// ------------------------ Admin Features --------------------------
+
+export const getAllPayments = async (req, res, next) => {
+  try {
+    const result = await paymentService.getAllPayments(req.query);
+
+    res
+      .status(ResponseStatus.OK.code)
+      .json(
+        new CustomResponse(
+          ResponseStatus.OK,
+          "Payments fetched successfully",
+          result
+        )
+      );
+  } catch (err) {
+    next(err);
+  }
+};

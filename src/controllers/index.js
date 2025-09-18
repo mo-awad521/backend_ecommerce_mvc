@@ -7,3 +7,4 @@ export * as cartController from "./cart.controller.js";
 export * as paymentController from "./payments.controller.js";
 export * as wishlistController from "./wishlist.controller.js";
 export * as reviewController from "./reviews.controller.js";
+export * as reportController from "./reports.controller.js";

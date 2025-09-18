@@ -205,3 +205,39 @@ export async function updateOrderStatus(orderId, newStatus, user) {
     data: { status: newStatus },
   });
 }
+
+//---------------------- Admin Featuers --------------------------
+
+export const getAllOrders = async (filters = {}) => {
+  const { status, page = 1, limit = 10 } = filters;
+
+  const where = status ? { status } : {};
+  const skip = (page - 1) * limit;
+  const take = parseInt(limit);
+
+  const total = await prisma.order.count({ where });
+
+  const orders = await prisma.order.findMany({
+    where,
+    skip,
+    take,
+    orderBy: { createdAt: "desc" },
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      items: {
+        include: {
+          product: { select: { id: true, title: true, price: true } },
+        },
+      },
+      payment: true,
+    },
+  });
+
+  return {
+    page: Number(page),
+    limit: take,
+    total,
+    totalPages: Math.ceil(total / take),
+    orders,
+  };
+};

@@ -12,6 +12,7 @@ import paymentRoutes from "./routes/payments.routes.js";
 import addressRoutes from "./routes/addresses.routes.js";
 import wishlistRoutes from "./routes/wishlists.routes.js";
 import reviewRoutes from "./routes/reviews.routes.js";
+import reportRoutes from "./routes/reports.routes.js";
 
 import errorHandler from "./middlewares/errorHandler.js";
 
@@ -31,7 +32,8 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/addresses", addressRoutes);
 app.use("/api/wishlist", wishlistRoutes);
-app.use("/api/reviews/", reviewRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api", reportRoutes);
 
 // ✅ Error handler
 app.use(errorHandler);
