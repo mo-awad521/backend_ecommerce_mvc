@@ -116,8 +116,11 @@ git clone https://github.com/mo-awad521/backend_ecommerce_mvc
 cd backend_ecommerce_mvc
 
 2. Install dependencies
-
+   
+```
 npm install
+
+```
 
 3. Setup environment
 
@@ -134,13 +137,18 @@ EMAIL_PASS=----
 
 4. Migrate & Seed Database
 
+```
 npx prisma migrate dev
 npx prisma db seed
 
-5. Run server
+```
 
+5. Run server
+   
+```
 npm run dev
 
+```
 ---
 
 📬 API Documentation
